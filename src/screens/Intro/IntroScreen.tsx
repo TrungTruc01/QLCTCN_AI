@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -14,10 +14,13 @@ import Animated, {
   withDelay,
   withTiming,
   Easing,
+  interpolate,
+  withRepeat,
+  runOnJS,
 } from 'react-native-reanimated';
-import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
+import LinearGradient from 'react-native-linear-gradient';
 
 const { width, height } = Dimensions.get('window');
 
@@ -27,93 +30,221 @@ type RootStackParamList = {
   Intro: undefined;
 };
 
-type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
-
 type Props = {
   onFinishIntro: () => void;
 };
 
+const typewriterText = 'Quản Lý Chi Tiêu';
+const slogan = 'Kiểm soát tài chính, sống chủ động!';
+const AnimatedIcon = Animated.createAnimatedComponent(Icon);
+
+const NUM_PARTICLES = 18;
+const PARTICLE_COLORS = ['#fff176', '#ffd54f', '#b2ff59', '#40c4ff', '#ff8a65', '#f06292', '#fff', '#fffde7'];
+const CONFETTI_COUNT = 18;
+const CONFETTI_COLORS = ['#ffd700', '#4caf50', '#1976d2', '#ff9800', '#e91e63', '#00bcd4'];
+
 const IntroScreen: React.FC<Props> = ({ onFinishIntro }) => {
-  const navigation = useNavigation<NavigationProp>();
+  const [displayedText, setDisplayedText] = useState('');
+  const [showSubtitle, setShowSubtitle] = useState(false);
   const iconScale = useSharedValue(0);
-  const iconOpacity = useSharedValue(0);
-  const iconRotate = useSharedValue(0);
-  const textOpacity = useSharedValue(0);
-  const textTranslateY = useSharedValue(50);
-  const circleScale = useSharedValue(0);
+  const iconBounce = useSharedValue(0);
+  const iconGlow = useSharedValue(0);
+  const shineAnim = useSharedValue(0);
+  const textFade = useSharedValue(0);
+  const sloganFade = useSharedValue(0);
+  const particlesAnim = Array.from({length: NUM_PARTICLES}, () => useSharedValue(0));
+  const confettiAnim = Array.from({length: CONFETTI_COUNT}, () => useSharedValue(0));
+
+  // Typewriter effect
+  useEffect(() => {
+    let i = 0;
+    const interval = setInterval(() => {
+      setDisplayedText(typewriterText.slice(0, i + 1));
+      i++;
+      if (i === typewriterText.length) {
+        clearInterval(interval);
+        setTimeout(() => setShowSubtitle(true), 400);
+      }
+    }, 60);
+    return () => clearInterval(interval);
+  }, []);
 
   useEffect(() => {
-    // Circle animation
-    circleScale.value = withSpring(1, {
-      damping: 15,
-      stiffness: 100,
-    });
-
-    // Icon animation sequence
+    // Icon bounce + pulse + glow
     iconScale.value = withSequence(
-      withSpring(1.2, { damping: 8 }),
-      withSpring(1, { damping: 8 })
+      withSpring(1.25, { damping: 5 }),
+      withSpring(1, { damping: 7 })
     );
-    iconOpacity.value = withSpring(1);
-    iconRotate.value = withTiming(360, {
-      duration: 1000,
-      easing: Easing.bezier(0.25, 0.1, 0.25, 1),
+    iconBounce.value = withRepeat(
+      withSequence(
+        withSpring(-22, { damping: 5 }),
+        withSpring(0, { damping: 7 })
+      ),
+      -1,
+      true
+    );
+    iconGlow.value = withRepeat(
+      withSequence(
+        withTiming(0.7, { duration: 600 }),
+        withTiming(1, { duration: 600 })
+      ),
+      -1,
+      true
+    );
+    shineAnim.value = withRepeat(withTiming(1, { duration: 1200 }), -1, false);
+    // Particles random
+    particlesAnim.forEach((anim, idx) => {
+      anim.value = withDelay(
+        idx * 80,
+        withRepeat(
+          withSequence(
+            withTiming(1, { duration: 1600 + idx * 20 }),
+            withTiming(0, { duration: 0 })
+          ),
+          -1,
+          false
+        )
+      );
     });
-    
-    // Text animation with delay
-    textOpacity.value = withDelay(
-      800,
-      withSpring(1, { damping: 8 })
-    );
-    textTranslateY.value = withDelay(
-      800,
-      withSpring(0, { damping: 8 })
-    );
-
-    // Navigate to main app after animation
+    // Confetti rơi xuống
+    confettiAnim.forEach((anim, idx) => {
+      anim.value = withDelay(
+        idx * 60,
+        withRepeat(
+          withSequence(
+            withTiming(1, { duration: 1800 + idx * 30 }),
+            withTiming(0, { duration: 0 })
+          ),
+          -1,
+          false
+        )
+      );
+    });
+    // Text fade in
+    textFade.value = withDelay(400, withTiming(1, { duration: 700 }));
+    sloganFade.value = withDelay(1200, withTiming(1, { duration: 700 }));
+    // Kết thúc intro sau 5 giây
     const timer = setTimeout(() => {
       onFinishIntro();
-    }, 3000);
-
+    }, 5000);
     return () => clearTimeout(timer);
   }, []);
 
-  const circleAnimatedStyle = useAnimatedStyle(() => {
-    return {
-      transform: [{ scale: circleScale.value }],
-    };
-  });
-
+  // Icon animation
   const iconAnimatedStyle = useAnimatedStyle(() => {
     return {
       transform: [
         { scale: iconScale.value },
-        { rotate: `${iconRotate.value}deg` }
+        { translateY: iconBounce.value },
       ],
-      opacity: iconOpacity.value,
+      shadowOpacity: iconGlow.value,
+      shadowRadius: 36 * iconGlow.value,
+      elevation: 12,
     };
   });
 
-  const textAnimatedStyle = useAnimatedStyle(() => {
+  // Shine effect
+  const shineStyle = useAnimatedStyle(() => {
+    const left = interpolate(shineAnim.value, [0, 1], [0, width * 0.4]);
     return {
-      opacity: textOpacity.value,
-      transform: [{ translateY: textTranslateY.value }],
+      position: 'absolute',
+      left,
+      top: 0,
+      width: 40,
+      height: width * 0.4,
+      backgroundColor: 'rgba(255,255,255,0.18)',
+      borderRadius: 20,
+      transform: [{ rotate: '25deg' }],
+      opacity: 0.7,
     };
   });
+
+  // Particles animation
+  const renderParticles = () => {
+    const r = width * 0.22;
+    return particlesAnim.map((anim, idx) => {
+      const angle = (2 * Math.PI * idx) / NUM_PARTICLES + Math.random();
+      const particleStyle = useAnimatedStyle(() => {
+        const progress = anim.value;
+        const radius = r + interpolate(progress, [0, 1], [0, 22]);
+        const x = width / 2 + radius * Math.cos(angle + progress) - 7;
+        const y = height * 0.22 + radius * Math.sin(angle + progress) - 7;
+        return {
+          position: 'absolute',
+          left: x,
+          top: y,
+          opacity: interpolate(progress, [0, 0.7, 1], [0, 1, 0]),
+          width: 14,
+          height: 14,
+          borderRadius: 7,
+          backgroundColor: PARTICLE_COLORS[idx % PARTICLE_COLORS.length],
+        };
+      });
+      return <Animated.View key={idx} style={particleStyle} />;
+    });
+  };
+
+  // Confetti animation
+  const renderConfetti = () => {
+    return confettiAnim.map((anim, idx) => {
+      const confettiStyle = useAnimatedStyle(() => {
+        const progress = anim.value;
+        const x = interpolate(progress, [0, 1], [width * Math.random(), width * Math.random()]);
+        const y = interpolate(progress, [0, 1], [-30, height * 0.7 + Math.random() * 40]);
+        const rotate = interpolate(progress, [0, 1], [0, 360]);
+        return {
+          position: 'absolute',
+          left: x,
+          top: y,
+          width: 12,
+          height: 12,
+          borderRadius: 3,
+          backgroundColor: CONFETTI_COLORS[idx % CONFETTI_COLORS.length],
+          opacity: 0.85,
+          transform: [{ rotate: `${rotate}deg` }],
+        };
+      });
+      return <Animated.View key={idx} style={confettiStyle} />;
+    });
+  };
+
+  // Text animation
+  const textFadeStyle = useAnimatedStyle(() => ({
+    opacity: textFade.value,
+    transform: [{ translateY: interpolate(textFade.value, [0, 1], [30, 0]) }],
+  }));
+  const sloganFadeStyle = useAnimatedStyle(() => ({
+    opacity: sloganFade.value,
+    transform: [{ translateY: interpolate(sloganFade.value, [0, 1], [30, 0]) }],
+  }));
 
   return (
     <View style={styles.container}>
       <StatusBar hidden />
-      <Animated.View style={[styles.circleContainer, circleAnimatedStyle]}>
-        <View style={styles.circle} />
-      </Animated.View>
-      <Animated.View style={[styles.iconContainer, iconAnimatedStyle]}>
-        <Icon name="wallet" size={width * 0.3} color="#4A90E2" />
-      </Animated.View>
-      <Animated.View style={[styles.textContainer, textAnimatedStyle]}>
-        <Text style={styles.title}>Quản Lý Chi Tiêu</Text>
-        <Text style={styles.subtitle}>Giúp bạn quản lý tài chính thông minh</Text>
-      </Animated.View>
+      <LinearGradient
+        colors={["#1976d2", "#64b5f6", "#fff"]}
+        start={{ x: 0.2, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={StyleSheet.absoluteFill}
+      />
+      {/* Confetti hoành tráng */}
+      {renderConfetti()}
+      {/* Particles lấp lánh */}
+      {renderParticles()}
+      {/* Icon ví tiền bounce + glow + shine */}
+      <View style={styles.iconWrap}>
+        <Animated.View style={[styles.iconContainer, iconAnimatedStyle]}>
+          <Icon name="wallet" size={width * 0.3} color="#1976d2" />
+          <Animated.View style={shineStyle} />
+        </Animated.View>
+      </View>
+      {/* Text động đẹp mắt */}
+      <View style={styles.textContainer}>
+        <Animated.Text style={[styles.title, textFadeStyle]}>{displayedText}</Animated.Text>
+        {showSubtitle && (
+          <Animated.Text style={[styles.slogan, sloganFadeStyle]}>{slogan}</Animated.Text>
+        )}
+      </View>
     </View>
   );
 };
@@ -125,40 +256,52 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  circleContainer: {
-    position: 'absolute',
+  iconWrap: {
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  circle: {
-    width: width * 0.8,
-    height: width * 0.8,
-    borderRadius: width * 0.4,
-    backgroundColor: '#F5F9FF',
+    width: width,
+    height: width * 0.6,
+    position: 'absolute',
+    top: height * 0.22,
+    left: 0,
+    zIndex: 2,
   },
   iconContainer: {
     width: width * 0.4,
     height: width * 0.4,
     alignItems: 'center',
     justifyContent: 'center',
-    zIndex: 1,
+    borderRadius: width * 0.2,
+    backgroundColor: '#e3f2fd',
+    elevation: 12,
+    shadowColor: '#1976d2',
+    shadowOffset: { width: 0, height: 0 },
+    overflow: 'hidden',
   },
   textContainer: {
     alignItems: 'center',
-    marginTop: 40,
-    zIndex: 1,
+    marginTop: height * 0.48 + 60,
+    zIndex: 3,
+    width: '100%',
   },
   title: {
-    fontSize: 28,
+    fontSize: 32,
     fontWeight: 'bold',
-    color: '#333',
+    color: '#1976d2',
     marginBottom: 10,
-  },
-  subtitle: {
-    fontSize: 16,
-    color: '#666',
+    letterSpacing: 1.5,
     textAlign: 'center',
-    paddingHorizontal: 20,
+  },
+  slogan: {
+    fontSize: 18,
+    color: '#333',
+    textAlign: 'center',
+    marginTop: 12,
+    fontStyle: 'italic',
+    fontWeight: '600',
+    textShadowColor: '#b3e5fc',
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 6,
   },
 });
 
