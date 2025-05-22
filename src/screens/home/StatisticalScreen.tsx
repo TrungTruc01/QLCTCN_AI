@@ -555,21 +555,23 @@ const StatisticalScreen = () => {
                 <Text style={[styles.chartTitle, { color: colors.text }]}>
                   Phân bổ chi tiêu theo danh mục
                 </Text>
-                <PieChart
-                  data={pieChartData}
-                  width={screenWidth}
-                  hasLegend={false}
-                  height={220}
-                  chartConfig={{
-                    backgroundGradientFrom: theme === 'dark' ? '#2a2a2a' : '#fff',
-                    backgroundGradientTo: theme === 'dark' ? '#2a2a2a' : '#fff',
-                    color: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`,
-                  }}
-                  accessor="amount"
-                  backgroundColor="transparent"
-                  paddingLeft="15"
-                  absolute
-                />
+                <View style={{ alignItems: 'center', width: '100%' }}>
+                  <PieChart
+                    data={pieChartData}
+                    width={screenWidth * 0.9}
+                    hasLegend={false}
+                    height={220}
+                    chartConfig={{
+                      backgroundGradientFrom: theme === 'dark' ? '#2a2a2a' : '#fff',
+                      backgroundGradientTo: theme === 'dark' ? '#2a2a2a' : '#fff',
+                      color: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`,
+                    }}
+                    accessor="amount"
+                    backgroundColor="transparent"
+                    paddingLeft="15"
+                    absolute
+                  />
+                </View>
                 <Legend
                   items={categoryList.map(i => i.category)}
                   colors={pieChartData.map(i => i.color)}
